@@ -1,0 +1,3 @@
+[submodule "cmake/modules/docbook"]
+	path = cmake/modules/docbook
+	url = https://github.com/jcurl/docbookgen-cmake

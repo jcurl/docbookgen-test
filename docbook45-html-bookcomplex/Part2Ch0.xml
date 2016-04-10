@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE part PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<part xmlns:xi="http://www.w3.org/2001/XInclude">
+  <title>Part II</title>
+
+  <xi:include href="Part2Ch1.xml"/>
+</part>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<book>
+  <bookinfo>
+    <title>Docbook 4.5 CMake Generation Example</title>
+
+    <subtitle>HTML with sections and olink's</subtitle>
+
+    <author>
+      <firstname>Jason</firstname>
+
+      <surname>Curl</surname>
+    </author>
+
+    <copyright>
+      <year>2016</year>
+
+      <holder>Jason Curl</holder>
+    </copyright>
+
+    <pubdate/>
+
+    <revhistory>
+      <revision>
+        <revnumber>1.0</revnumber>
+
+        <date>2016-04-10</date>
+
+        <revdescription>
+          <para>Initial version.</para>
+        </revdescription>
+      </revision>
+    </revhistory>
+  </bookinfo>
+
+  <xi:include href="Part1Ch0.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+
+  <xi:include href="Part2Ch0.xml"
+              xmlns:xi="http://www.w3.org/2001/XInclude"/>
+</book>

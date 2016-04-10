@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<chapter id="sec.performanceconsiderations">
+  <title>Performance Considerations</title>
+
+  <section id="sec.windows2003">
+    <title>Advanced Format and Windows Server 2003</title>
+
+    <para>The server uses Advanced Format drives for the data storage, where
+    the Virtual Machines are kept. There are two types of 4k drives:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>512: 512-byte emulation mode. The drive presents itself as a
+        legacy 512-byte sectored drive at the firmware level. Thus addresses
+        is in units of 512 bytes (LBA 2048 is the first 1MB boundary,
+        <emphasis>2048 x 512 bytes</emphasis> is 1024kB or 1MB.</para>
+      </listitem>
+
+      <listitem>
+        <para>4kn: The drive uses native 4k sectors. Most operating systems as
+        of today (including VMWare vSphere ESXi 5.0) do not support these
+        drives.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>The hardware installed is the WD20EARX which Advanced Format using
+    512e. Microsoft do not support Advanced Format drives for operating
+    systems Windows Server 2003, Windows XP or earlier. This does not imply
+    that software will not work on these drives. There are however known
+    performance degredations unless one is prepared to invest more time in
+    configuring the system.</para>
+
+    <para>The default configuration for Windows Server 2003 (and Windows XP)
+    is to install the first partition at an LBA of 63. This is not aligned
+    with the 4k sectors of the Advanced Format drives. An LBA of 63 on a 512e
+    AF-drive aligns to 31.5kB, which is not a multiple of 4kB.</para>
+
+    <para>Thus for the older operating systems, it is required to repartition
+    the virtual images so that partitions begin on a 1MB boundary (LBA
+    2048).</para>
+  </section>
+
+  <section>
+    <title>Advanced Format Implementation</title>
+
+    <para>There is a detailed discussion about <ulink
+    url="http://en.wikipedia.org/wiki/Advanced_Format">Advanced Format</ulink>
+    on Wikipedia. Advanced Format drives are an issue for the performance of
+    systems as for older operating systems, such as Windows XP and Windows
+    Server 2003, partitions are not aligned with the sectors on the
+    drive.</para>
+
+    <para>An Advanced Format drive, such as the Western Digital WD20EARX, has
+    4k sectors physically on the platters. Windows XP and Windows Server 2003
+    generally define cluster sizes within their filesystem to be also 4k.
+    </para>
+
+    <para>The performance loss comes about by the 4k clusters not aligning
+    exactly with the 4k sectors on the drive. This is due to the first LBA of
+    the partitions for the filesystems being LBA 63. This implies the first
+    cluster has an offset of 31.5kb.</para>
+
+    <figure id="fig.wxp_partition_misalignment">
+      <title>Sector Misalignment</title>
+
+      <mediaobject>
+        <imageobject>
+          <imagedata fileref="figures/AF_Misalignment.png"/>
+        </imageobject>
+      </mediaobject>
+    </figure>
+
+    <para>From <xref linkend="fig.wxp_partition_misalignment"/>, we see that a
+    LBA of 63-70 is physical sectors 6-7. When reading a 4k cluster from the
+    filesystem, two physical sectors must be read instead of one. For
+    streaming data, this is unlikely to cause an issue. For reading random
+    data, we begin to see some inefficiencies.</para>
+
+    <para>When writing a single 4k cluster, the drive actually has to read two
+    4k sectors, modify the data and write the two physical sectors back to
+    disk. Again, when writing data continuously, the drive can probably
+    optimise itself so that there are fewer read operations. But as we begin
+    to read/write random data, we see that the write operations receive the
+    biggest performance hit.</para>
+
+    <para>For Windows XP and Windows Server 2003, we can work around this by
+    organising the partitions such that the clusters in the filesystem are
+    aligned with the sectors on the drive. This implies reading a single
+    cluster will read only one sector (less pollution in the drive cache) and
+    writing a 4k cluster saves time by not having to read both sectors, wait
+    for the spindle of the drive to relocate the sectors before writing
+    again.</para>
+
+    <para>For Windows Home Server (version 1), Microsoft recommend against
+    using the new Advanced Format Drives. See <ulink
+    url="http://support.microsoft.com/kb/2385637/en-us">Microsoft
+    Knowledgebase Article 2385637</ulink>.</para>
+  </section>
+
+  <section>
+    <title>Aligning Partitions</title>
+
+    <para>Instructions for alignment of the partitions in VMware vSphere ESXi
+    5.0, were first obtained from the <ulink
+    url="http://www.tcpdump.com/kb/virtualization/vmware-esx-server/vmware-disk-alignment/vmdk-windows.html">tcpdump</ulink>
+    website. Follow the steps below to ensure alignment of partitions within
+    VMware.</para>
+
+    <orderedlist>
+      <listitem>
+        <para>Create a new virtual machine using the vSphere client</para>
+      </listitem>
+
+      <listitem>
+        <para>From the services console, go to the directory of the virtual
+        machine</para>
+
+        <screen>$ <command>ssh root@192.168.1.2</command>
+The authenticity of host '192.168.1.2 (192.168.1.2)' can't be established.
+RSA key fingerprint is 02:2a:bc:a7:4e:b7:42:0d:92:1b:7f:1c:73:ae:f1:23.
+Are you sure you want to continue connecting (yes/no)? <userinput>yes</userinput>
+Warning: Permanently added '192.168.1.2' (RSA) to the list of known hosts.
+Password: <emphasis><userinput>Password</userinput></emphasis>
+The time and date of this login have been sent to the system logs.
+
+VMware offers supported, powerful system administration tools.  Please
+see www.vmware.com/go/sysadmintools for details.
+
+The ESXi Shell can be disabled by an administrative user. See the
+vSphere Security documentation for more information.
+~ # <command>cd /vmfs/volums/WD20EARX_0/Win2k3</command>
+/vmfs/volumes/4eaafde8-296a6fe6-c8cf-1c6f65cd8202/Win2k3 # <command>ls</command>
+Win2k3-flat.vmdk    Win2k3.vmsd         vmware-1.log
+Win2k3.nvram        Win2k3.vmx          vmware-2.log
+Win2k3.vmdk         Win2k3.vmxf         vmware.log</screen>
+      </listitem>
+
+      <listitem>
+        <para>Determine the number of cylinders for the Virtual Disk Image
+        (see the entry in <remark>marked</remark>)</para>
+
+        <screen>/vmfs/volumes/4eaafde8-296a6fe6-c8cf-1c6f65cd8202/Win2k3 # <command>cat Win2k3.vmdk</command>
+# Disk DescriptorFile
+version=1
+encoding="UTF-8"
+CID=fffffffe
+parentCID=ffffffff
+isNativeSnapshot="no"
+createType="vmfs"
+
+# Extent description
+RW 268435456 VMFS "Win2k3-flat.vmdk"
+
+# The Disk Data Base
+#DDB
+
+ddb.virtualHWVersion = "8"
+ddb.longContentID = "c769d669fd07da2e2ee3b7f2fffffffe"
+ddb.uuid = "60 00 C2 9e e3 91 ec b5-a9 31 13 ec 03 6a 43 be"
+ddb.geometry.cylinders = "<remark>16709</remark>"
+ddb.geometry.heads = "255"
+ddb.geometry.sectors = "63"
+ddb.adapterType = "lsilogic"</screen>
+      </listitem>
+
+      <listitem>
+        <para>Prepare the partition table, before installing Windows XP or
+        Windows Server 2003</para>
+
+        <screen>/vmfs/volumes/4eaafde8-296a6fe6-c8cf-1c6f65cd8202/Win2k3 # <command>fdisk ./Win2k3-flat.vmdk</command>
+Device contains neither a valid DOS partition table, nor Sun, SGI or OSF disklabel
+Building a new DOS disklabel. Changes will remain in memory only,
+until you decide to write them. After that the previous content
+won't be recoverable.
+
+Unknown value(s) for: cylinders (settable in the extra functions menu)
+Warning: invalid flag 0x00,0x00 of partition table 4 will be corrected by w(rite)</screen>
+      </listitem>
+
+      <listitem>
+        <para>Manually configure <command>fdisk</command> with the correct
+        number of cylinders</para>
+
+        <screen>Command (m for help): <userinput>x</userinput>
+
+Expert command (m for help): <userinput>c</userinput>
+Number of cylinders (1-1048576): <userinput>16709</userinput>
+
+The number of cylinders for this disk is set to 16709.
+There is nothing wrong with that, but this is larger than 1024,
+and could in certain setups cause problems with:
+1) software that runs at boot time (e.g., old versions of LILO)
+2) booting and partitioning software from other OSs
+   (e.g., DOS FDISK, OS/2 FDISK)</screen>
+      </listitem>
+
+      <listitem>
+        <para>Now confirm that we have no partitions set up and the correct
+        number of cylinders are chosen.</para>
+
+        <screen>Expert command (m for help): <userinput>p</userinput>
+
+Disk ./Win2k3-flat.vmdk: 255 heads, 63 sectors, <remark>16709</remark> cylinders
+
+Nr AF  Hd Sec  Cyl  Hd Sec  Cyl      Start       Size ID
+ 1 00   0   0    0   0   0    0          0          0 00
+ 2 00   0   0    0   0   0    0          0          0 00
+ 3 00   0   0    0   0   0    0          0          0 00
+ 4 00   0   0    0   0   0    0          0          0 00</screen>
+      </listitem>
+
+      <listitem>
+        <para>Exit <emphasis>Expert</emphasis> mode and create a new primary
+        partition</para>
+
+        <screen>Expert command (m for help): <userinput>r</userinput>
+
+Command (m for help): <userinput>n</userinput>
+Command action
+   e   extended
+   p   primary partition (1-4)
+<userinput>p</userinput>
+Partition number (1-4): <userinput>1</userinput>
+First cylinder (1-16709, default 1): <emphasis><userinput>Press Enter</userinput></emphasis>
+  Using default value 1
+Last cylinder or +size or +sizeM or +sizeK (1-16709, default 16709): <emphasis><userinput>Press Enter</userinput></emphasis>
+  Using default value 16709</screen>
+      </listitem>
+
+      <listitem>
+        <para>Reenter <emphasis>Expert</emphasis> mode and change the
+        alignment of the partition, to 1MB</para>
+
+        <screen>Command (m for help): <userinput>x</userinput>
+
+Expert command (m for help): <userinput>b</userinput>
+Partition number (1-4): <userinput>1</userinput>
+New beginning of data (63-268430084, default 63): <userinput>2048</userinput>
+
+Expert command (m for help): <userinput>p</userinput>
+
+Disk ./Win2k3-flat.vmdk: 255 heads, 63 sectors, 16709 cylinders
+
+Nr AF  Hd Sec  Cyl  Hd Sec  Cyl      Start       Size ID
+ 1 00   1   1    0 254  63 1023       <remark>2048</remark>  268428037 83
+ 2 00   0   0    0   0   0    0          0          0 00
+ 3 00   0   0    0   0   0    0          0          0 00
+ 4 00   0   0    0   0   0    0          0          0 00</screen>
+      </listitem>
+
+      <listitem>
+        <para>Exit <emphasis>Expert</emphasis> mode again and now set the
+        partition type</para>
+
+        <screen>Expert command (m for help): <userinput>r</userinput>
+
+Command (m for help): <userinput>t</userinput>
+Selected partition 1
+Hex code (type L to list codes): <userinput>7</userinput>
+Changed system type of partition 1 to 7 (HPFS/NTFS)</screen>
+      </listitem>
+
+      <listitem>
+        <para>Write the partition changes back to disk</para>
+
+        <screen>Command (m for help): <userinput>w</userinput>
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table
+fdisk: WARNING: rereading partition table failed, kernel still uses old 
+  table: Inappropriate ioctl for device
+/vmfs/volumes/4eaafde8-296a6fe6-c8cf-1c6f65cd8202/Win2k3 #</screen>
+      </listitem>
+
+      <listitem>
+        <para>Now you can start your virtual machine and install Windows
+        Server 2003. It should present you with the partition that you've just
+        created. Be sure not to delete the partition (e.g. select the
+        partition and press <emphasis>Enter</emphasis>).</para>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata contentwidth="6in" fileref="figures/Win2k3install.png"/>
+          </imageobject>
+        </mediaobject>
+      </listitem>
+    </orderedlist>
+  </section>
+
+  <section>
+    <title>Performance Measurements</title>
+
+    <para><xref linkend="table.perftest1"/> and <xref
+    linkend="table.perftest2"/> contain specific performance results for two
+    different systems with both drives being Advanced Format 512e.</para>
+
+    <para>Results in <xref linkend="table.perftest1"/> is obtained by
+    installing Windows Server 2003 Standard Edition into a 400GB
+    partition.</para>
+
+    <para>Results in <xref linkend="table.perftest2"/> is obtained by
+    installing Windows Server 2003 Standard Edition into a 128GB partition.
+    The Virtual Machine has 1GB of RAM with 4 logical CPUs.</para>
+
+    <table id="table.perftest1">
+      <title>Perftest T5500 CPU @ 1.6GHz, WD10TPVT 1.0GB, 400GB
+      partition</title>
+
+      <tgroup cols="3">
+        <thead>
+          <row>
+            <entry>Align</entry>
+
+            <entry>Test</entry>
+
+            <entry>Results</entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry morerows="3">Standard (LBA=63)</entry>
+
+            <entry>File Copy (s)</entry>
+
+            <entry>127</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Read (MB/s)</entry>
+
+            <entry>55.4, 59.0, 57.0, 58.8</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Write (MB/s)</entry>
+
+            <entry>35.4, 44.0, 47.0, 44.9</entry>
+          </row>
+
+          <row>
+            <entry>Random R/W (MB/s)</entry>
+
+            <entry>1.09, 1.09, 1.11, 1.08</entry>
+          </row>
+
+          <row>
+            <entry morerows="3">Aligned (LBA=2048)</entry>
+
+            <entry>File Copy (s)</entry>
+
+            <entry>109</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Read (MB/s)</entry>
+
+            <entry>61.4, 59.9, 60.5, 60.0</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Write (MB/s)</entry>
+
+            <entry>56.2, 55.3, 56.0, 56.6</entry>
+          </row>
+
+          <row>
+            <entry>Random R/W (MB/s)</entry>
+
+            <entry>2.02, 2.01, 1.99, 1.99</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <table id="table.perftest2">
+      <title>Perftest i3-2120T @ 2.6GHz, WD20EARX 2.0GB, 128GB
+      partition</title>
+
+      <tgroup cols="3">
+        <thead>
+          <row>
+            <entry>Align</entry>
+
+            <entry>Test</entry>
+
+            <entry>Results</entry>
+          </row>
+        </thead>
+
+        <tbody>
+          <row>
+            <entry morerows="5">Standard (LBA=63)</entry>
+
+            <entry>File Copy (s)</entry>
+
+            <entry>189, 98, 98; 92</entry>
+          </row>
+
+          <row>
+            <entry>Install Drivers (s)</entry>
+
+            <entry>158, 140, 142; 153</entry>
+          </row>
+
+          <row>
+            <entry>Installation</entry>
+
+            <entry>400, 331, 343; 327</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Read (MB/s)</entry>
+
+            <entry>81.0, 85.4, 73.2, 83.7, 84.9; 81.6, 78.9</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Write (MB/s)</entry>
+
+            <entry>33.7, 32.0, 35.1, 33.7, 32.1; 32.9, 34.6</entry>
+          </row>
+
+          <row>
+            <entry>Random R/W (MB/s)</entry>
+
+            <entry>1.74, 1.73, 1.76, 1.71, 1.75; 1.69, 1.59</entry>
+          </row>
+
+          <row>
+            <entry morerows="5">Aligned (LBA=2048)</entry>
+
+            <entry>File Copy (s)</entry>
+
+            <entry><emphasis>97</emphasis>, <emphasis>97</emphasis>;
+            67</entry>
+          </row>
+
+          <row>
+            <entry>Install Drivers (s)</entry>
+
+            <entry><emphasis>136</emphasis>, <emphasis>137</emphasis>;
+            132</entry>
+          </row>
+
+          <row>
+            <entry>Installation</entry>
+
+            <entry><emphasis>282</emphasis>, <emphasis>284</emphasis>;
+            250</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Read (MB/s)</entry>
+
+            <entry><emphasis>60.7</emphasis>, <emphasis>60.7</emphasis>,
+            <emphasis>58.1</emphasis>; 91.4, 89.6, 84.6, 85.0</entry>
+          </row>
+
+          <row>
+            <entry>Sequential Write (MB/s)</entry>
+
+            <entry><emphasis>44.1</emphasis>, <emphasis>45.2</emphasis>,
+            <emphasis>45.0</emphasis>; 75.5, 79.8, 80.9, 77.8</entry>
+          </row>
+
+          <row>
+            <entry>Random R/W (MB/s)</entry>
+
+            <entry><emphasis>4.38</emphasis>, <emphasis>4.26</emphasis>,
+            <emphasis>4.21</emphasis>; 4.64, 4.35, 4.74, 4.65</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <para>Notes about the results:</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>File Copy: The time it took (in seconds) to do a quick format of
+        the entire partition and to copy files from the Windows Server 2003
+        Standard Edition ISO image to the partition</para>
+      </listitem>
+
+      <listitem>
+        <para>Install Drivers: The time it took (in seconds) after the reboot,
+        to install the drivers, until the user is requested to configure the
+        system</para>
+      </listitem>
+
+      <listitem>
+        <para>Installation: The time it took after configuration (in seconds),
+        until the system reboots</para>
+      </listitem>
+
+      <listitem>
+        <para>Sequential Read, Write, Random R/W: The performance of the
+        partition, as reported by PassMark 7.0 Evaluation Version</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>When observing the results in <xref linkend="table.perftest2"/>, we
+    see that the performance for sequential reads and writes are lower than we
+    might expect. There was a difference in the tests for aligned and
+    unaligned, such that the location of the VMDK is at a significantly
+    different location on the disk. The unaligned tests had two other virtual
+    machines causing an offset of about 200GB into the drive. The higher
+    results from the aligned partition are more similar to the tests done for
+    unaligned. </para>
+
+    <para>Thus we can see that alignment has a big influence in performance.
+    We also see for the WD20EARX drives that the position on the disk also has
+    an impact.</para>
+  </section>
+
+  <section>
+    <title>Summary</title>
+
+    <para>We see that there is a visible benefit, to both the installation
+    time and the performance measurements made, when the partitions are
+    correctly aligned. The random read/writes benefit the most, as one would
+    expect.</para>
+  </section>
+</chapter>

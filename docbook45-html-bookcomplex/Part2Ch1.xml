@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<chapter>
+  <title>References to other sections</title>
+
+  <para>This chapter tests that references to other sections works as
+  expected.</para>
+
+  <section>
+    <title>WIndows Server</title>
+
+    <para>See <olink targetptr="sec.performanceconsiderations"/> for details
+	about optimising Windows Server 2003 on 4K disks (512e).</para>
+  </section>
+
+  <section id="sec.opensslcreatecsr">
+    <title>Creating a Certificate Signing Request</title>
+
+    <para>A CSR is the process of generating a public key (based on a private
+    key) that a CA will then sign with their own private key. By passing the
+    CSR to the CA, it generates a certificate that effectively says the public
+    block is known and trusted by the CA. At no time is the private key
+    portion known by the CA, so we can guarantee that even if the CA were
+    compromised, no one has your private key.</para>
+
+    <para>This section covers on creating a certificate signing request using
+    OpenSSL.</para>
+
+    <section id="sec.opensslcreateprvandcsr">
+      <title>Create Private/Public Key Pair and CSR</title>
+
+      <para>To create a CSR, that you give to a CA, use the command</para>
+
+      <screen>$ <command>openssl req -new -newkey rsa:4096 -nodes -keyout mycert.prv -out mycert.req</command></screen>
+
+      <para>or you can also provide the subject field on the command
+      line</para>
+
+      <screen>$ <command>openssl req -new -newkey rsa:4096 -nodes</command> \
+  <command>-subj '/CN=Jason Curl/C=DE/ST=Bavaria/L=Unterschleissheim/emailAddress=jason@thecurls.onmicrosoft.com'</command> \
+  <command>-keyout mycert.prv -out mycert.req</command></screen>
+    </section>
+
+    <section id="sec.opensslcreatecsrfromexprvkey">
+      <title>Create CSR from Existing Private Key</title>
+
+      <para>If you have already generated previously a private key, let's say
+      it's called <filename>mycert.prv</filename>, then you can create a CSR
+      based on the private key. If you already have a certificate with a
+      private and public key, and you need to create a new CSR based on your
+      existing private key.</para>
+
+      <screen>$ <command>openssl req -new -key mycert.prv -out mycert.req</command></screen>
+
+      <para>again, you can also specify the subject</para>
+
+      <screen>$ <command>openssl req -new -key mycert.prv</command> \
+  <command>-subj '/CN=Jason Curl/C=DE/ST=Bavaria/L=Unterschleissheim/emailAddress=jason@thecurls.onmicrosoft.com'</command> \
+  <command>-out mycert.csr</command></screen>
+
+      <para>The common reason this needs to be done is to ensure that two
+      separate certificates have the same private key. This is useful if you
+      have an expired certificate and you need to generate a new certificate,
+      but to keep the same private key. Keeping the private key implies that
+      all objects that used the old certificate will automatically work with
+      the new certificate. Only the certificate has been updated, but the
+      private key remains the same, so algorithms based purely on the private
+      key will work also with the new certificate.</para>
+
+      <para>Such an example is email. Your certificate may have expired, so
+      you cannot use it any longer to send email. You would then generate a
+      new CSR based on the same private key. All emails encrypted or signed
+      with the old certificate will still be validated and decryptable with
+      the new certificate. This is because the public/private key portions
+      remain the same, only the X509 certificate contents change.</para>
+
+      <para>This is another reason why your private key is absolutely
+      important to keep secret! Any one with your private key can then
+      generate a new CSR with their own name and can encrypt and decrypt
+      content using your identity, defeating the purpose of certificate
+      trust.</para>
+    </section>
+
+    <section>
+      <title>Check the CSR Contents</title>
+
+      <para>To check the contents of the CSR, you can use the command</para>
+
+      <screen>$ <command>openssl req -text -noout -in mycert.csr</command></screen>
+    </section>
+
+    <section>
+      <title>The CA Certificate</title>
+
+      <para>After you've created a CSR, you submit this to your CA. They sign
+      the CSR and give you back a public certificate block that belongs with
+      your private key, which might be as in <xref
+      linkend="fig.casignedcert"/>. Save this file as your public certificate,
+      e.g. <filename>mycert.cer</filename>.</para>
+
+      <para>To view the contents of a certificate:</para>
+
+      <screen>$ <command>openssl x509 -text -in mycert.cer</command></screen>
+
+      <figure id="fig.casignedcert">
+        <title>Signed Certificate from CA</title>
+
+        <mediaobject>
+          <imageobject>
+            <imagedata fileref="figures/CAcertRenew.png" scale="80"/>
+          </imageobject>
+        </mediaobject>
+      </figure>
+    </section>
+  </section>
+
+</chapter>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
+<chapter>
+  <title>Overview</title>
+
+  <para>A sample of various texts typical for an overview.</para>
+
+  <section>
+    <title>Typographical Conventions</title>
+
+    <para>The following typographical conventions are applied to words and
+    phrases to clarify the type of information that is being described. These
+    conventions apply to inline text as well as screen output to identify what
+    the remote system prints and what is expected by you when input is
+    required.</para>
+
+    <itemizedlist>
+      <listitem>
+        <para>Normal text that appears on the screen is shown using a
+        <literal>literal</literal> type.</para>
+      </listitem>
+
+      <listitem>
+        <para>Executable commands are shown as
+        <command>ifconfig</command>.</para>
+      </listitem>
+
+      <listitem>
+        <para>User input is shown as
+        <userinput>&lt;username&gt;</userinput>.</para>
+      </listitem>
+
+      <listitem>
+        <para>Useful information that you should take note of is in
+        <remark>marked up</remark>.</para>
+      </listitem>
+
+      <listitem>
+        <para>If you need to enter something that is not visible on the screen
+        when you type, this will be shown as <emphasis><userinput>Enter
+        Password</userinput></emphasis>.</para>
+      </listitem>
+
+      <listitem>
+        <para>Filenames are shown as <filename>/etc/passwd</filename>.</para>
+      </listitem>
+
+      <listitem>
+        <para>If you need to modify a file, the text to modify is shown using
+        the <replaceable>replaceable markup, as this
+        sample</replaceable>.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para>As an example:</para>
+
+    <screen>Login: <userinput>jcurl</userinput>
+Password: <emphasis><userinput>Enter password</userinput></emphasis>
+$ <command>ifconfig</command>
+eth0      Link encap:Ethernet  HWaddr 00:50:56:12:04:ea
+          inet addr:<remark>192.168.1.12</remark>  Bcast:192.168.1.255  Mask:255.255.0
+          inet6 addr: fe80::250:56ff:fe12:4ea/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1</screen>
+  </section>
+</chapter>
